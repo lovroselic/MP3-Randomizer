@@ -10,11 +10,12 @@ https://www.tutorialspoint.com/python/python_gui_programming.htm
 """
 
 import tkinter as tk
+import tkinter.filedialog
 import os
 import os.path
 
 _TITLE = "MP3 Randomizer"
-_VERSION = "0.1.3"
+_VERSION = "0.2.4"
 _CONFIG_FILE_NAME = "Randomizer.cfg"
 
 
@@ -25,6 +26,7 @@ class Application(tk.Frame):
         menu = tk.Menu(self.master)
         self.master.config(menu=menu)
         self.master.minsize(640, 400)
+        self.master.wm_title(_TITLE)
         #
         # menus
         #
@@ -49,66 +51,76 @@ class Application(tk.Frame):
         aboutMenu.add_command(label='Help', command=self.notYet)
         aboutMenu.add_separator()
         aboutMenu.add_command(label='About', command=self.about)
-        self.create_widgets()
         #
         # config
         #
-        self.__INPUT = None
-        self.__OUTPUT = None
-        self.loadConfig()
+        self._INPUT = tk.StringVar(value='')
+        self._OUTPUT = tk.StringVar(value='')
+        self._N = tk.StringVar(value='999')
         self.pack()
+        self.create_widgets(master)
+        self.loadConfig()
         self.info()
 
-    def create_widgets(self):
+    def create_widgets(self, master):
+        master.columnconfigure(0, weight=1)
+        master.columnconfigure(1, weight=50)
         #
         # Frames
         #
-        configFrame = tk.Frame(self.master, width=400, height=100, bg='black')
+        configFrame = tk.Frame(self.master, borderwidth=2, relief=tk.SUNKEN)
         configFrame.pack_propagate(0)
-        configFrame.pack(side=tk.TOP, anchor=tk.NW)
+        configFrame.pack(side=tk.LEFT, anchor=tk.NW)
         #
         # Labels
         #
-        inpLabel = tk.Label(configFrame, text="Input directory:", bg='white')
+        inpLabel = tk.Label(configFrame, text="Input directory:")
         inpLabel.grid(row=0, column=0, sticky=tk.W)
-        outLabel = tk.Label(configFrame, text="Output directory:", bg='white')
+        outLabel = tk.Label(configFrame, text="Output directory:")
         outLabel.grid(row=1, column=0, sticky=tk.W)
-        inpSource = tk.Label(configFrame, text="C:/", bg='white')
+        inpSource = tk.Label(configFrame,
+                             text=self._INPUT,
+                             textvariable=self._INPUT)
         inpSource.grid(row=0, column=1, sticky=tk.W)
-        outSource = tk.Label(configFrame, text="D:/", bg='white')
+        outSource = tk.Label(configFrame,
+                             text=self._OUTPUT,
+                             textvariable=self._OUTPUT)
         outSource.grid(row=1, column=1, sticky=tk.W)
-        # inpLabel.pack(side=tk.TOP, anchor=tk.NW)
-        return
+        numberLabel = tk.Label(configFrame,
+                               text="Number of files:")
+        numberLabel.grid(row=2, column=0, sticky=tk.W)
+        numberEntry = tk.Entry(configFrame,
+                               text=self._N,
+                               textvariable=self._N)
+        numberEntry.grid(row=2, column=1, sticky=tk.W)
 
     def info(self):
         print("CWD:", os.getcwd())
-        print("input:", self.__INPUT)
-        print("output", self.__OUTPUT)
+        print("input:", self._INPUT.get())
+        print("output:", self._OUTPUT.get())
+        print("N:", self._N.get())
         print("\n")
 
     def loadConfig(self):
         if os.path.exists(_CONFIG_FILE_NAME):
-            print("....")
             with open(_CONFIG_FILE_NAME, 'r') as F:
                 data = F.readlines()
-            [self.__INPUT, self.__OUTPUT] = data
+            for i, cfg in enumerate([self._INPUT, self._OUTPUT, self._N]):
+                cfg.set(data[i].strip('\n'))
 
     def saveConfig(self):
-        print('\nsaving config in dir:', os.getcwd())
         with open(_CONFIG_FILE_NAME, 'w') as F:
-            for cfg in [self.__INPUT, self.__OUTPUT]:
-                print(cfg)
-                cfg = cfg or ""
-                F.write(cfg)
+            for cfg in [self._INPUT, self._OUTPUT, self._N]:
+                F.write(cfg.get())
                 F.write('\n')
 
     def setInput(self):
-        self.__INPUT = tk.filedialog.askdirectory()
-        print("setting input:", self.__INPUT)
+        self._INPUT.set(tk.filedialog.askdirectory())
+        # print("setting input:", self._INPUT.get())
 
     def setOutput(self):
-        self.__OUTPUT = tk.filedialog.askdirectory()
-        print("setting output:", self.__OUTPUT)
+        self._OUTPUT.set(tk.filedialog.askdirectory())
+        # print("setting output:", self._OUTPUT.get())
 
     def notYet(self):
         print('not yet implemented')
@@ -124,5 +136,4 @@ class Application(tk.Frame):
 
 root = tk.Tk()
 app = Application(master=root)
-root.wm_title(_TITLE)
 app.mainloop()
