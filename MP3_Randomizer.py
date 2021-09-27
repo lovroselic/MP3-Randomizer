@@ -13,10 +13,13 @@ import tkinter as tk
 import tkinter.filedialog
 import os
 import os.path
+from fnmatch import fnmatch
+import pandas as pd
 
 _TITLE = "MP3 Randomizer"
-_VERSION = "0.2.4"
+_VERSION = "0.3.0"
 _CONFIG_FILE_NAME = "Randomizer.cfg"
+_PATTERN = "*.mp3"
 
 
 class Application(tk.Frame):
@@ -25,8 +28,9 @@ class Application(tk.Frame):
         self.master = master
         menu = tk.Menu(self.master)
         self.master.config(menu=menu)
-        self.master.minsize(640, 400)
+        self.master.minsize(800, 600)
         self.master.wm_title(_TITLE)
+        self.fileList = None
         #
         # menus
         #
@@ -43,7 +47,7 @@ class Application(tk.Frame):
                               command=self.quitApp)
         actionMenu = tk.Menu(menu, tearoff=0)
         menu.add_cascade(label="Action", menu=actionMenu)
-        actionMenu.add_command(label='Find music', command=self.notYet)
+        actionMenu.add_command(label='Find music', command=self.getFiles)
         actionMenu.add_command(label='Randomize', command=self.notYet)
         actionMenu.add_command(label='Copy to output', command=self.notYet)
         aboutMenu = tk.Menu(menu, tearoff=0)
@@ -57,6 +61,7 @@ class Application(tk.Frame):
         self._INPUT = tk.StringVar(value='')
         self._OUTPUT = tk.StringVar(value='')
         self._N = tk.StringVar(value='999')
+        self._FOUND = tk.StringVar(value='0')
         self.pack()
         self.create_widgets(master)
         self.loadConfig()
@@ -86,6 +91,7 @@ class Application(tk.Frame):
                              text=self._OUTPUT,
                              textvariable=self._OUTPUT)
         outSource.grid(row=1, column=1, sticky=tk.W)
+
         numberLabel = tk.Label(configFrame,
                                text="Number of files:")
         numberLabel.grid(row=2, column=0, sticky=tk.W)
@@ -93,6 +99,13 @@ class Application(tk.Frame):
                                text=self._N,
                                textvariable=self._N)
         numberEntry.grid(row=2, column=1, sticky=tk.W)
+
+        foundLabel = tk.Label(configFrame, text="Files found:")
+        foundLabel.grid(row=3, column=0, sticky=tk.W)
+        foundEntry = tk.Label(configFrame,
+                              text=self._FOUND,
+                              textvariable=self._FOUND)
+        foundEntry.grid(row=3, column=1, sticky=tk.W)
 
     def info(self):
         print("CWD:", os.getcwd())
@@ -115,12 +128,12 @@ class Application(tk.Frame):
                 F.write('\n')
 
     def setInput(self):
-        self._INPUT.set(tk.filedialog.askdirectory())
-        # print("setting input:", self._INPUT.get())
+        self._INPUT.set(
+            tk.filedialog.askdirectory(initialdir=self._INPUT.get()))
 
     def setOutput(self):
-        self._OUTPUT.set(tk.filedialog.askdirectory())
-        # print("setting output:", self._OUTPUT.get())
+        self._OUTPUT.set(
+            tk.filedialog.askdirectory(initialdir=self._OUTPUT.get()))
 
     def notYet(self):
         print('not yet implemented')
@@ -133,7 +146,25 @@ class Application(tk.Frame):
                                '{}\n v {}\nby Lovro Selic'
                                .format(_TITLE, _VERSION))
 
+    def getFiles(self):
+        global DF
+        # global TEST
+        self.fileList = getAllFiles(self._INPUT.get(), _PATTERN)
+        # TEST = self.fileList
+        self._FOUND.set(len(self.fileList))
+        DF = pd.DataFrame({'path': self.fileList})
 
+
+def getAllFiles(root, pat):
+    files = []
+    for path, subdir, file in os.walk(root):
+        for name in file:
+            if fnmatch(name, pat):
+                files.append(os.path.join(path, name))
+    return files
+
+
+global DF
 root = tk.Tk()
 app = Application(master=root)
 app.mainloop()
