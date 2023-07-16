@@ -7,6 +7,8 @@ Created on Sat Aug 14 14:13:11 2021
 https://docs.python.org/3/library/dialog.html
 https://www.tutorialspoint.com/python/python_gui_programming.htm
 https://www.tutorialspoint.com/python/python_gui_programming.htm
+https://www.youtube.com/playlist?list=PLQVvvaa0QuDclKx-QpC9wntnURXVJqLyk
+https://docs.python.org/3/library/tk.html
 """
 
 import tkinter as tk
@@ -15,11 +17,14 @@ import os
 import os.path
 from fnmatch import fnmatch
 import pandas as pd
+import shutil
+import pandasgui
 
 _TITLE = "MP3 Randomizer"
-_VERSION = "0.3.0"
+_VERSION = "0.5.0"
 _CONFIG_FILE_NAME = "Randomizer.cfg"
 _PATTERN = "*.mp3"
+_FILE = "Randomizer.csv"
 
 
 class Application(tk.Frame):
@@ -48,11 +53,14 @@ class Application(tk.Frame):
         actionMenu = tk.Menu(menu, tearoff=0)
         menu.add_cascade(label="Action", menu=actionMenu)
         actionMenu.add_command(label='Find music', command=self.getFiles)
-        actionMenu.add_command(label='Randomize', command=self.notYet)
-        actionMenu.add_command(label='Copy to output', command=self.notYet)
+        actionMenu.add_command(label='Save list', command=self.saveList)
+        actionMenu.add_command(label='Load list', command=self.loadList)
+        actionMenu.add_separator()
+        actionMenu.add_command(label='Randomize', command=self.randomizeFiles)
+        actionMenu.add_command(label='Copy to output', command=self.copyFiles)
         aboutMenu = tk.Menu(menu, tearoff=0)
         menu.add_cascade(label="Help", menu=aboutMenu)
-        aboutMenu.add_command(label='Help', command=self.notYet)
+        aboutMenu.add_command(label='Help', command=self.help)
         aboutMenu.add_separator()
         aboutMenu.add_command(label='About', command=self.about)
         #
@@ -62,6 +70,7 @@ class Application(tk.Frame):
         self._OUTPUT = tk.StringVar(value='')
         self._N = tk.StringVar(value='999')
         self._FOUND = tk.StringVar(value='0')
+        self._SELECTED = tk.StringVar(value='0')
         self.pack()
         self.create_widgets(master)
         self.loadConfig()
@@ -93,7 +102,7 @@ class Application(tk.Frame):
         outSource.grid(row=1, column=1, sticky=tk.W)
 
         numberLabel = tk.Label(configFrame,
-                               text="Number of files:")
+                               text="Number of files to copy:\t")
         numberLabel.grid(row=2, column=0, sticky=tk.W)
         numberEntry = tk.Entry(configFrame,
                                text=self._N,
@@ -102,10 +111,13 @@ class Application(tk.Frame):
 
         foundLabel = tk.Label(configFrame, text="Files found:")
         foundLabel.grid(row=3, column=0, sticky=tk.W)
-        foundEntry = tk.Label(configFrame,
-                              text=self._FOUND,
-                              textvariable=self._FOUND)
+        foundEntry = tk.Label(configFrame, text=self._FOUND, textvariable=self._FOUND)
         foundEntry.grid(row=3, column=1, sticky=tk.W)
+
+        selectLabel = tk.Label(configFrame, text="Files selected:")
+        selectLabel.grid(row=4, column=0, sticky=tk.W)
+        selectEntry = tk.Label(configFrame, text=self._SELECTED, textvariable=self._SELECTED)
+        selectEntry.grid(row=4, column=1, sticky=tk.W)
 
     def info(self):
         print("CWD:", os.getcwd())
@@ -126,6 +138,7 @@ class Application(tk.Frame):
             for cfg in [self._INPUT, self._OUTPUT, self._N]:
                 F.write(cfg.get())
                 F.write('\n')
+        tk.messagebox.showinfo("Saved", "Config saved.")
 
     def setInput(self):
         self._INPUT.set(
@@ -142,17 +155,62 @@ class Application(tk.Frame):
         self.master.destroy()
 
     def about(self):
-        tk.messagebox.showinfo(_TITLE,
-                               '{}\n v {}\nby Lovro Selic'
-                               .format(_TITLE, _VERSION))
+        tk.messagebox.showinfo(_TITLE, '{}\n v {}\nby Lovro Selic'.format(_TITLE, _VERSION))
 
     def getFiles(self):
         global DF
-        # global TEST
         self.fileList = getAllFiles(self._INPUT.get(), _PATTERN)
-        # TEST = self.fileList
         self._FOUND.set(len(self.fileList))
-        DF = pd.DataFrame({'path': self.fileList})
+        DF = pd.DataFrame({'Path': self.fileList})
+        DF['Filenane'] = DF['Path'].apply(extractFile)
+        DF[['Artist', 'Title']] = DF['Filenane'].apply(artistAndTitle).apply(pd.Series)
+        column_order = ['Title', 'Artist', 'Filenane', 'Path']
+        DF = DF[column_order]
+        tk.messagebox.showinfo("Found files", "Found {} mp3".format(len(DF)))
+
+    def randomizeFiles(self):
+        global SELECTION
+        try:
+            N = int(self._N.get())
+            SELECTION = DF.sample(n=N)
+            # print(SELECTION)
+            pandasgui.show(SELECTION)
+            self._SELECTED.set(len(SELECTION))
+        except Exception as e:
+            tk.messagebox.showinfo("Create list first", "File list not yet created.")
+            print("An error occurred:", str(e))
+
+    def help(self):
+        tk.messagebox.showinfo("Help", "There is no help, sorry.")
+
+    def saveList(self):
+        try:
+            DF.to_csv(_FILE, index=False)
+            tk.messagebox.showinfo("Saved", "List saved.")
+        except Exception as e:
+            tk.messagebox.showinfo("Create list first", "File list not yet created.")
+            print("An error occurred:", str(e))
+
+    def loadList(self):
+        global DF
+        if os.path.exists(_FILE):
+            DF = pd.read_csv(_FILE)
+            self.fileList = DF["Path"].tolist()
+            self._FOUND.set(len(self.fileList))
+        else:
+            tk.messagebox.showinfo("List not made", "Saved file list does not exist.")
+
+    def copyFiles(self):
+        global SELECTION
+        try:
+            source_paths = SELECTION['Path'].tolist()
+            for path in source_paths:
+                filename = path.split('\\')[-1]
+                out = self._OUTPUT.get() + '/' + filename
+                shutil.copy(path, out)
+        except Exception as e:
+            tk.messagebox.showinfo("Randomize list first", "Nothing to copy yet. Randomize list first")
+            print("An error occurred:", str(e))
 
 
 def getAllFiles(root, pat):
@@ -162,6 +220,18 @@ def getAllFiles(root, pat):
             if fnmatch(name, pat):
                 files.append(os.path.join(path, name))
     return files
+
+
+def extractFile(x):
+    f = x.split('\\')[-1]
+    return f.split('.')[0]
+
+
+def artistAndTitle(x):
+    temp = x.split(' - ')
+    a = temp[-1].strip()
+    t = temp[0].strip()
+    return a, t
 
 
 global DF
