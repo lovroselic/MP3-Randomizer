@@ -13,15 +13,16 @@ https://docs.python.org/3/library/tk.html
 
 import tkinter as tk
 import tkinter.filedialog
+from tkinter import ttk
 import os
 import os.path
 from fnmatch import fnmatch
 import pandas as pd
 import shutil
-import pandasgui
+# import pandasgui
 
 _TITLE = "MP3 Randomizer"
-_VERSION = "0.5.0"
+_VERSION = "0.6.0"
 _CONFIG_FILE_NAME = "Randomizer.cfg"
 _PATTERN = "*.mp3"
 _FILE = "Randomizer.csv"
@@ -36,20 +37,19 @@ class Application(tk.Frame):
         self.master.minsize(800, 600)
         self.master.wm_title(_TITLE)
         self.fileList = None
+        self.frame1 = None
+        self.frame2 = None
         #
         # menus
         #
         setupMenu = tk.Menu(menu, tearoff=0)
         menu.add_cascade(label="Setup", menu=setupMenu)
-        setupMenu.add_command(label="Set input folder",
-                              command=self.setInput)
-        setupMenu.add_command(label="Set output folder",
-                              command=self.setOutput)
+        setupMenu.add_command(label="Set input folder", command=self.setInput)
+        setupMenu.add_command(label="Set output folder", command=self.setOutput)
         setupMenu.add_separator()
         setupMenu.add_command(label="Save config", command=self.saveConfig)
         setupMenu.add_separator()
-        setupMenu.add_command(label="Quit",
-                              command=self.quitApp)
+        setupMenu.add_command(label="Quit", command=self.quitApp)
         actionMenu = tk.Menu(menu, tearoff=0)
         menu.add_cascade(label="Action", menu=actionMenu)
         actionMenu.add_command(label='Find music', command=self.getFiles)
@@ -75,6 +75,7 @@ class Application(tk.Frame):
         self.create_widgets(master)
         self.loadConfig()
         self.info()
+        self.loadList()
 
     def create_widgets(self, master):
         master.columnconfigure(0, weight=1)
@@ -82,9 +83,11 @@ class Application(tk.Frame):
         #
         # Frames
         #
-        configFrame = tk.Frame(self.master, borderwidth=2, relief=tk.SUNKEN)
+        configLabelFrame = tk.LabelFrame(self.master, text="Configuration")
+        configLabelFrame.pack(side=tk.TOP, anchor=tk.CENTER, padx=10, pady=10)
+        configFrame = tk.Frame(configLabelFrame, borderwidth=2, relief=tk.SUNKEN)
         configFrame.pack_propagate(0)
-        configFrame.pack(side=tk.LEFT, anchor=tk.NW)
+        configFrame.pack(side=tk.TOP, anchor=tk.NW, fill='both', expand=True)
         #
         # Labels
         #
@@ -92,21 +95,14 @@ class Application(tk.Frame):
         inpLabel.grid(row=0, column=0, sticky=tk.W)
         outLabel = tk.Label(configFrame, text="Output directory:")
         outLabel.grid(row=1, column=0, sticky=tk.W)
-        inpSource = tk.Label(configFrame,
-                             text=self._INPUT,
-                             textvariable=self._INPUT)
+        inpSource = tk.Label(configFrame, text=self._INPUT, textvariable=self._INPUT)
         inpSource.grid(row=0, column=1, sticky=tk.W)
-        outSource = tk.Label(configFrame,
-                             text=self._OUTPUT,
-                             textvariable=self._OUTPUT)
+        outSource = tk.Label(configFrame, text=self._OUTPUT, textvariable=self._OUTPUT)
         outSource.grid(row=1, column=1, sticky=tk.W)
 
-        numberLabel = tk.Label(configFrame,
-                               text="Number of files to copy:\t")
+        numberLabel = tk.Label(configFrame, text="Number of files to copy:\t")
         numberLabel.grid(row=2, column=0, sticky=tk.W)
-        numberEntry = tk.Entry(configFrame,
-                               text=self._N,
-                               textvariable=self._N)
+        numberEntry = tk.Entry(configFrame, text=self._N, textvariable=self._N)
         numberEntry.grid(row=2, column=1, sticky=tk.W)
 
         foundLabel = tk.Label(configFrame, text="Files found:")
@@ -118,6 +114,18 @@ class Application(tk.Frame):
         selectLabel.grid(row=4, column=0, sticky=tk.W)
         selectEntry = tk.Label(configFrame, text=self._SELECTED, textvariable=self._SELECTED)
         selectEntry.grid(row=4, column=1, sticky=tk.W)
+        #
+        # dataframe frames
+        #
+        self.frame1 = ttk.Frame(self.master, borderwidth=2, relief=tk.SUNKEN)
+        self.frame1.pack(fill='both', expand=True, padx=10, pady=10, side=tk.TOP)
+        label1 = ttk.Label(self.frame1, text="Files available")
+        label1.pack(pady=10)
+
+        self.frame2 = ttk.Frame(self.master,  borderwidth=2, relief=tk.SUNKEN)
+        self.frame2.pack(fill='both', expand=True, padx=10, pady=10, side=tk.TOP)
+        label2 = ttk.Label(self.frame2, text="Selection")
+        label2.pack(pady=10)
 
     def info(self):
         print("CWD:", os.getcwd())
@@ -173,9 +181,9 @@ class Application(tk.Frame):
         try:
             N = int(self._N.get())
             SELECTION = DF.sample(n=N)
-            # print(SELECTION)
-            pandasgui.show(SELECTION)
+            # pandasgui.show(SELECTION)
             self._SELECTED.set(len(SELECTION))
+            display_dataframe(self.frame2, SELECTION)
         except Exception as e:
             tk.messagebox.showinfo("Create list first", "File list not yet created.")
             print("An error occurred:", str(e))
@@ -197,6 +205,7 @@ class Application(tk.Frame):
             DF = pd.read_csv(_FILE)
             self.fileList = DF["Path"].tolist()
             self._FOUND.set(len(self.fileList))
+            display_dataframe(self.frame1, DF)
         else:
             tk.messagebox.showinfo("List not made", "Saved file list does not exist.")
 
@@ -232,6 +241,29 @@ def artistAndTitle(x):
     a = temp[-1].strip()
     t = temp[0].strip()
     return a, t
+
+
+def display_dataframe(frame, dataframe):
+    # Create a Treeview widget
+    treeview = ttk.Treeview(frame)
+    treeview.pack(fill='both', expand=True)
+
+    # Configure the Treeview
+    treeview['columns'] = list(dataframe.columns)
+    treeview['show'] = 'headings'
+
+    # Add column headings
+    for column in dataframe.columns:
+        treeview.heading(column, text=column)
+
+    # Add data rows
+    for row in dataframe.itertuples(index=False):
+        treeview.insert('', 'end', values=row)
+
+    # Add a scrollbar
+    scrollbar = ttk.Scrollbar(frame, orient='vertical', command=treeview.yview)
+    scrollbar.pack(side='right', fill='y')
+    treeview.configure(yscrollcommand=scrollbar.set)
 
 
 global DF
