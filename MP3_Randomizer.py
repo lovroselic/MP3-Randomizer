@@ -19,10 +19,11 @@ import os.path
 from fnmatch import fnmatch
 import pandas as pd
 import shutil
+import threading
 import pandasgui
 
 _TITLE = "MP3 Randomizer"
-_VERSION = "0.8.0"
+_VERSION = "0.9.0"
 _CONFIG_FILE_NAME = "Randomizer.cfg"
 _PATTERN = "*.mp3"
 _FILE = "Randomizer.csv"
@@ -60,7 +61,7 @@ class Application(tk.Frame):
         actionMenu.add_command(label='Randomize', command=self.randomizeFiles)
         # actionMenu.add_command(label='Analyze', command=self.analyze)
         actionMenu.add_separator()
-        actionMenu.add_command(label='Copy to output', command=self.copyFiles)
+        actionMenu.add_command(label='Copy to output', command=self.startCopy)
         aboutMenu = tk.Menu(menu, tearoff=0)
         menu.add_cascade(label="Help", menu=aboutMenu)
         aboutMenu.add_command(label='Help', command=self.help)
@@ -74,6 +75,8 @@ class Application(tk.Frame):
         self._N = tk.StringVar(value='999')
         self._FOUND = tk.StringVar(value='0')
         self._SELECTED = tk.StringVar(value='0')
+        self.progress_window = None
+        self.progress_bar = None
         self.pack()
         self.create_widgets(master)
         self.loadConfig()
@@ -228,17 +231,34 @@ class Application(tk.Frame):
         else:
             tk.messagebox.showinfo("List not made", "Saved file list does not exist.")
 
+    def startCopy(self):
+        self.progress_window = tk.Toplevel(self.master)
+        self.progress_window.title("File Copy Progress")
+        self.progress_window.geometry("300x100")
+        self.progress_bar = ttk.Progressbar(self.progress_window, mode='determinate')
+        self.progress_bar.pack(padx=10, pady=10)
+        threading.Thread(target=self.copyFiles).start()
+
     def copyFiles(self):
         global SELECTION
         try:
             source_paths = SELECTION['Path'].tolist()
-            for path in source_paths:
+            total_files = len(source_paths)
+            for i, path in enumerate(source_paths, start=1):
                 filename = path.split('\\')[-1]
                 out = self._OUTPUT.get() + '/' + filename
                 shutil.copy(path, out)
+                self.updateProgress(i, total_files)
+            self.progress_window.destroy()
+            tk.messagebox.showinfo("Copy Complete", "Files copied successfully.")
         except Exception as e:
             tk.messagebox.showinfo("Randomize list first", "Nothing to copy yet. Randomize list first")
             print("An error occurred:", str(e))
+
+    def updateProgress(self, current, total):
+        self.progress_bar['value'] = current
+        self.progress_bar['maximum'] = total
+        self.progress_window.update()
 
 
 def getAllFiles(root, pat):
@@ -263,26 +283,19 @@ def artistAndTitle(x):
 
 
 def display_dataframe(frame, dataframe):
-    # Clear previous display
     for child in frame.winfo_children():
         child.destroy()
-    # Create a Treeview widget
+
     treeview = ttk.Treeview(frame)
     treeview.pack(fill='both', expand=True)
-
-    # Configure the Treeview
     treeview['columns'] = list(dataframe.columns)
     treeview['show'] = 'headings'
 
-    # Add column headings
     for column in dataframe.columns:
         treeview.heading(column, text=column)
-
-    # Add data rows
     for row in dataframe.itertuples(index=False):
         treeview.insert('', 'end', values=row)
 
-    # Add a scrollbar
     scrollbar = ttk.Scrollbar(frame, orient='vertical', command=treeview.yview)
     scrollbar.pack(side='right', fill='y')
     treeview.configure(yscrollcommand=scrollbar.set)
