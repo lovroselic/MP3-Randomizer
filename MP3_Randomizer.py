@@ -19,10 +19,10 @@ import os.path
 from fnmatch import fnmatch
 import pandas as pd
 import shutil
-# import pandasgui
+import pandasgui
 
 _TITLE = "MP3 Randomizer"
-_VERSION = "0.6.0"
+_VERSION = "0.8.0"
 _CONFIG_FILE_NAME = "Randomizer.cfg"
 _PATTERN = "*.mp3"
 _FILE = "Randomizer.csv"
@@ -34,11 +34,12 @@ class Application(tk.Frame):
         self.master = master
         menu = tk.Menu(self.master)
         self.master.config(menu=menu)
-        self.master.minsize(800, 600)
+        self.master.minsize(1920, 1024)
         self.master.wm_title(_TITLE)
         self.fileList = None
         self.frame1 = None
         self.frame2 = None
+        self.frame3 = None
         #
         # menus
         #
@@ -57,6 +58,8 @@ class Application(tk.Frame):
         actionMenu.add_command(label='Load list', command=self.loadList)
         actionMenu.add_separator()
         actionMenu.add_command(label='Randomize', command=self.randomizeFiles)
+        # actionMenu.add_command(label='Analyze', command=self.analyze)
+        actionMenu.add_separator()
         actionMenu.add_command(label='Copy to output', command=self.copyFiles)
         aboutMenu = tk.Menu(menu, tearoff=0)
         menu.add_cascade(label="Help", menu=aboutMenu)
@@ -117,15 +120,20 @@ class Application(tk.Frame):
         #
         # dataframe frames
         #
-        self.frame1 = ttk.Frame(self.master, borderwidth=2, relief=tk.SUNKEN)
-        self.frame1.pack(fill='both', expand=True, padx=10, pady=10, side=tk.TOP)
-        label1 = ttk.Label(self.frame1, text="Files available")
-        label1.pack(pady=10)
+        frame1LabelFrame = tk.LabelFrame(self.master, text="Files available")
+        frame1LabelFrame.pack(fill='both', expand=True, padx=10, pady=10, side=tk.TOP)
+        self.frame1 = ttk.Frame(frame1LabelFrame, borderwidth=2, relief=tk.SUNKEN)
+        self.frame1.pack(fill='both', expand=True)
 
-        self.frame2 = ttk.Frame(self.master,  borderwidth=2, relief=tk.SUNKEN)
-        self.frame2.pack(fill='both', expand=True, padx=10, pady=10, side=tk.TOP)
-        label2 = ttk.Label(self.frame2, text="Selection")
-        label2.pack(pady=10)
+        frame2LabelFrame = tk.LabelFrame(self.master, text="Selection")
+        frame2LabelFrame.pack(fill='both', expand=True, padx=10, pady=10, side=tk.TOP)
+        self.frame2 = ttk.Frame(frame2LabelFrame, borderwidth=2, relief=tk.SUNKEN)
+        self.frame2.pack(fill='both', expand=True)
+
+        frame3LabelFrame = tk.LabelFrame(self.master, text="Top 10 Artist selected")
+        frame3LabelFrame.pack(fill='both', expand=True, padx=10, pady=10, side=tk.TOP)
+        self.frame3 = ttk.Frame(frame3LabelFrame, borderwidth=2, relief=tk.SUNKEN)
+        self.frame3.pack(fill='both', expand=True)
 
     def info(self):
         print("CWD:", os.getcwd())
@@ -178,14 +186,25 @@ class Application(tk.Frame):
 
     def randomizeFiles(self):
         global SELECTION
+        global TOP
         try:
             N = int(self._N.get())
             SELECTION = DF.sample(n=N)
             # pandasgui.show(SELECTION)
             self._SELECTED.set(len(SELECTION))
             display_dataframe(self.frame2, SELECTION)
+            TOP = top_artists_by_count(SELECTION)
+            display_dataframe(self.frame3, TOP)
         except Exception as e:
             tk.messagebox.showinfo("Create list first", "File list not yet created.")
+            print("An error occurred:", str(e))
+
+    def analyze(self):
+        global SELECTION
+        try:
+            pandasgui.show(SELECTION)
+        except Exception as e:
+            tk.messagebox.showinfo("No selection", "Randomize selection first")
             print("An error occurred:", str(e))
 
     def help(self):
@@ -244,6 +263,9 @@ def artistAndTitle(x):
 
 
 def display_dataframe(frame, dataframe):
+    # Clear previous display
+    for child in frame.winfo_children():
+        child.destroy()
     # Create a Treeview widget
     treeview = ttk.Treeview(frame)
     treeview.pack(fill='both', expand=True)
@@ -264,6 +286,12 @@ def display_dataframe(frame, dataframe):
     scrollbar = ttk.Scrollbar(frame, orient='vertical', command=treeview.yview)
     scrollbar.pack(side='right', fill='y')
     treeview.configure(yscrollcommand=scrollbar.set)
+
+
+def top_artists_by_count(dataframe, n=10):
+    artist_counts = dataframe['Artist'].value_counts().head(n)
+    top_artists_df = pd.DataFrame({'Artist': artist_counts.index, 'Count': artist_counts.values})
+    return top_artists_df
 
 
 global DF
