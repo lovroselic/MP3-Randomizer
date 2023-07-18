@@ -23,7 +23,7 @@ import threading
 import pandasgui
 
 _TITLE = "MP3 Randomizer"
-_VERSION = "0.9.0"
+_VERSION = "0.9.1"
 _CONFIG_FILE_NAME = "Randomizer.cfg"
 _PATTERN = "*.mp3"
 _FILE = "Randomizer.csv"
@@ -271,8 +271,9 @@ def getAllFiles(root, pat):
 
 
 def extractFile(x):
-    f = x.split('\\')[-1]
-    return f.split('.')[0]
+    filename_with_extension = os.path.basename(x)
+    filename_without_extension = os.path.splitext(filename_with_extension)[0]
+    return filename_without_extension
 
 
 def artistAndTitle(x):
